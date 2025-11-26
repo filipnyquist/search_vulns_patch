@@ -4,15 +4,13 @@
  */
 
 import { describe, test, expect } from 'bun:test';
+import * as cpeSearchModule from '../src/utils/cpe_search.ts';
 
 // We're testing the internal logic of how queries are transformed
 // Since getAlternativeQueries is not exported, we test indirectly through the corrections
 
 describe('CPE Search Query Corrections', () => {
   test('Angular query should be in POPULAR_QUERY_CORRECTIONS', () => {
-    // Import the module to check the constant
-    const cpeSearchModule = require('../src/utils/cpe_search.ts');
-    
     // We can't directly access POPULAR_QUERY_CORRECTIONS since it's not exported
     // But we can verify the fix is in place by checking the file content
     // This is a basic sanity test
