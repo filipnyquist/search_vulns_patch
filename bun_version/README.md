@@ -17,19 +17,42 @@ This is a Bun.js/TypeScript implementation of search_vulns, a tool to search for
 
 ## Installation
 
-1. Install dependencies:
+1. **Install Bun.js** (if not already installed):
 ```bash
-cd bun_version
-bun install
+curl -fsSL https://bun.sh/install | bash
 ```
 
-2. The project requires database files from the main Python implementation. You can either:
-   - Copy the database files from the Python version's `resources/` directory
-   - Or download them using the Python version's update command: `search_vulns -u`
+2. **Navigate to the bun_version directory**:
+```bash
+cd bun_version
+```
 
-The databases should be placed in `bun_version/resources/`:
-- `vulndb.db3` - Vulnerability database
-- `productdb.db3` - Product database
+3. **Set up database files**:
+
+The Bun.js version uses the same database files as the Python version. You have two options:
+
+**Option A: Copy from Python installation**
+```bash
+# If you have the Python version installed
+./setup.sh
+```
+
+**Option B: Manual setup**
+```bash
+# Install Python version first
+pip install search_vulns
+search_vulns -u
+
+# Then copy the database files
+mkdir -p resources
+cp ~/.local/share/search_vulns/resources/*.db3 resources/
+# Or from wherever your Python version stores the databases
+```
+
+4. **Verify installation**:
+```bash
+bun src/cli.ts --version
+```
 
 ## Usage
 
