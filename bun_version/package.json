@@ -1,0 +1,25 @@
+{
+  "name": "search-vulns-bun",
+  "version": "0.8.2",
+  "description": "Search for known vulnerabilities in software using software titles or a CPE 2.3 string - Bun.js/TypeScript implementation",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "cli": "bun run src/cli.ts",
+    "server": "bun run src/server.ts",
+    "test": "bun test",
+    "dev": "bun --watch src/server.ts"
+  },
+  "keywords": [
+    "security",
+    "vulnerability",
+    "cve",
+    "cpe",
+    "nvd",
+    "exploit",
+    "pentest"
+  ],
+  "author": "Dustin Born",
+  "license": "MIT"
+}
