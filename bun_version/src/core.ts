@@ -8,6 +8,7 @@ import {
   cpeMatchesPrefix,
   getCpeVersion,
 } from './utils/version';
+import { search_cpes, MATCH_CPE_23_RE } from './utils/cpe_search';
 
 /**
  * Merge vulnerabilities from different modules, combining aliases and deduplicating
@@ -131,10 +132,29 @@ export async function searchVulns(
     : { cpe: [] };
   const potProductIds: Record<string, any[]> = {};
   
-  // Check if query is a CPE string
-  const cpePattern = /^cpe:2\.3:[a-z]:/i;
-  if (cpePattern.test(queryProcessed)) {
-    productIds.cpe = [queryProcessed];
+  // Perform CPE search if not already a CPE and no product IDs provided
+  if (!knownProductIds && productDb) {
+    if (!MATCH_CPE_23_RE.test(queryProcessed)) {
+      // Search for CPE matches using product name/version
+      const cpeSearchResult = await search_cpes(
+        queryProcessed,
+        productDb,
+        config.CPE_SEARCH_COUNT || 10,
+        config.CPE_SEARCH_THRESHOLD || 0.68,
+        config
+      );
+      
+      if (cpeSearchResult.cpes && cpeSearchResult.cpes.length > 0) {
+        productIds.cpe = cpeSearchResult.cpes.map(([cpe, _score]) => cpe);
+      }
+      
+      if (cpeSearchResult.pot_cpes && cpeSearchResult.pot_cpes.length > 0) {
+        potProductIds.cpe = cpeSearchResult.pot_cpes;
+      }
+    } else {
+      // Query is already a CPE string
+      productIds.cpe = [queryProcessed];
+    }
   }
 
   let vulns: Record<string, Vulnerability> = {};
