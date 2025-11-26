@@ -3,6 +3,11 @@ import type { Config } from './types/config';
 import type { SearchVulnsResult } from './types/vulnerability';
 import { Vulnerability, MatchReason, compareMatchReasons } from './types/vulnerability';
 import { getDatabaseConnection } from './utils/database';
+import {
+  isVersionInRange,
+  cpeMatchesPrefix,
+  getCpeVersion,
+} from './utils/version';
 
 /**
  * Merge vulnerabilities from different modules, combining aliases and deduplicating
@@ -120,21 +125,26 @@ export async function searchVulns(
   const queryProcessed = query.trim();
   const extraParams: Record<string, any> = {};
 
-  // TODO: Load and call modules for preprocessing, product ID search, vuln search, etc.
-  // For now, implement basic functionality
-
   // Initialize result structure
   const productIds: Record<string, string[]> = knownProductIds
     ? { ...knownProductIds }
     : { cpe: [] };
   const potProductIds: Record<string, any[]> = {};
+  
+  // Check if query is a CPE string
+  const cpePattern = /^cpe:2\.3:[a-z]:/i;
+  if (cpePattern.test(queryProcessed)) {
+    productIds.cpe = [queryProcessed];
+  }
+
   let vulns: Record<string, Vulnerability> = {};
 
   // Basic vulnerability search (simplified - in full implementation, modules would handle this)
   if (!skipVulnSearch && vulnDb) {
-    // This is a placeholder for module-based search
-    // In the Python version, modules like nvd.search_vulns_nvd handle the actual search
     vulns = await searchVulnsBasic(queryProcessed, productIds, vulnDb, config, extraParams);
+    
+    // Add exploit information
+    addExploitInfo(vulns, vulnDb);
 
     // Filter vulnerabilities based on options
     for (const vulnId of Object.keys(vulns)) {
@@ -183,6 +193,65 @@ export async function searchVulns(
 }
 
 /**
+ * Add exploit information to vulnerabilities
+ */
+function addExploitInfo(vulns: Record<string, Vulnerability>, vulnDb: Database): void {
+  for (const [vulnId, vuln] of Object.entries(vulns)) {
+    // Check for CVE IDs in the vulnerability and its aliases
+    const cveIds = new Set<string>();
+    if (vulnId.startsWith('CVE-')) {
+      cveIds.add(vulnId);
+    }
+    for (const alias of Object.keys(vuln.aliases)) {
+      if (alias.startsWith('CVE-')) {
+        cveIds.add(alias);
+      }
+    }
+    
+    // Fetch exploits for each CVE from different sources
+    for (const cveId of cveIds) {
+      // NVD exploit references
+      try {
+        const stmt = vulnDb.query('SELECT exploit_ref FROM nvd_exploits_refs_view WHERE cve_id = ?');
+        const exploits = stmt.all(cveId) as any[];
+        for (const exploit of exploits) {
+          vuln.exploits.add(exploit.exploit_ref);
+        }
+      } catch (error) {
+        // Silently ignore if view doesn't exist
+      }
+      
+      // Exploit-DB
+      try {
+        const stmt = vulnDb.query('SELECT edb_ids FROM cve_edb WHERE cve_id = ?');
+        const edbResult = stmt.get(cveId) as any;
+        if (edbResult && edbResult.edb_ids) {
+          const edbIds = edbResult.edb_ids.split(',');
+          for (const edbId of edbIds) {
+            vuln.exploits.add(`https://www.exploit-db.com/exploits/${edbId.trim()}`);
+          }
+        }
+      } catch (error) {
+        // Silently ignore
+      }
+      
+      // PoC in GitHub
+      try {
+        const stmt = vulnDb.query('SELECT reference FROM poc_in_github WHERE cve_id = ?');
+        const pocs = stmt.all(cveId) as any[];
+        for (const poc of pocs) {
+          if (poc.reference) {
+            vuln.exploits.add(poc.reference);
+          }
+        }
+      } catch (error) {
+        // Silently ignore
+      }
+    }
+  }
+}
+
+/**
  * Basic vulnerability search (placeholder for module-based implementation)
  */
 async function searchVulnsBasic(
@@ -193,6 +262,97 @@ async function searchVulnsBasic(
   extraParams: Record<string, any>
 ): Promise<Record<string, Vulnerability>> {
   const vulns: Record<string, Vulnerability> = {};
+
+  // First, check if we have CPEs to search for
+  if (productIds.cpe && productIds.cpe.length > 0) {
+    for (const cpe of productIds.cpe) {
+      try {
+        const cpePrefix = cpe.split(':').slice(0, 5).join(':') + ':';
+        const queryVersion = getCpeVersion(cpe);
+        
+        // Search in NVD CPE mappings with version range support
+        const stmt = vulnDb.query(
+          `SELECT DISTINCT n.cve_id, n.description, n.published, n.last_modified, 
+           n.cvss_version, n.base_score, n.vector, n.cisa_known_exploited,
+           nc.cpe, nc.cpe_version_start, nc.is_cpe_version_start_including,
+           nc.cpe_version_end, nc.is_cpe_version_end_including
+           FROM nvd n 
+           JOIN nvd_cpe nc ON n.cve_id = nc.cve_id 
+           WHERE nc.cpe LIKE ?`
+        );
+        const rows = stmt.all(cpePrefix + '%') as any[];
+
+        for (const row of rows) {
+          // Check if CPE prefix matches
+          if (!cpeMatchesPrefix(cpe, row.cpe)) {
+            continue;
+          }
+          
+          // Determine match reason based on version matching
+          let matchReason = MatchReason.PRODUCT_MATCH;
+          let matches = false;
+          
+          const vulnCpeVersion = getCpeVersion(row.cpe);
+          const hasVersionRange = row.cpe_version_start || row.cpe_version_end;
+          
+          if (queryVersion && queryVersion !== '*') {
+            if (hasVersionRange) {
+              // Check if query version is in the vulnerability's version range
+              matches = isVersionInRange(
+                queryVersion,
+                row.cpe_version_start,
+                row.is_cpe_version_start_including === 1,
+                row.cpe_version_end,
+                row.is_cpe_version_end_including === 1
+              );
+              if (matches) {
+                matchReason = MatchReason.VERSION_IN_RANGE;
+              }
+            } else if (vulnCpeVersion === '*') {
+              // General product vulnerability (no specific version)
+              matches = true;
+              matchReason = MatchReason.GENERAL_PRODUCT_UNCERTAIN;
+            } else if (vulnCpeVersion === queryVersion) {
+              // Exact version match
+              matches = true;
+              matchReason = MatchReason.PRODUCT_MATCH;
+            }
+          } else if (!queryVersion || queryVersion === '*') {
+            // Query has no version, match general vulnerabilities
+            if (vulnCpeVersion === '*') {
+              matches = true;
+              matchReason = MatchReason.GENERAL_PRODUCT_OK;
+            }
+          }
+          
+          if (matches) {
+            const vuln = new Vulnerability({
+              id: row.cve_id,
+              matchReason: matchReason,
+              matchSources: ['nvd'],
+              description: row.description || '',
+              published: row.published || '',
+              modified: row.last_modified || '',
+              cvssVer: row.cvss_version || '',
+              cvss: row.base_score?.toString() || '-1.0',
+              cvssVec: row.vector || '',
+              cisaKnownExploited: row.cisa_known_exploited === 1,
+              href: `https://nvd.nist.gov/vuln/detail/${row.cve_id}`,
+            });
+            
+            // Merge if already exists
+            if (vulns[vuln.id]) {
+              vulns[vuln.id].mergeWithVulnerability(vuln);
+            } else {
+              vulns[vuln.id] = vuln;
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Error searching for CPE ${cpe}:`, error);
+      }
+    }
+  }
 
   // Split query by commas to handle multiple IDs
   const queries = query.split(',').map(q => q.trim());
