@@ -4,6 +4,7 @@
 
 import { describe, test, expect } from 'bun:test';
 import { Database } from 'bun:sqlite';
+import { existsSync } from 'fs';
 import { 
   getXeolDatabaseConnection, 
   queryXeolEOL, 
@@ -11,28 +12,33 @@ import {
 } from '../src/utils/xeol';
 import type { SearchVulnsResult } from '../src/types/vulnerability';
 
+const XEOL_DB_PATH = 'resources/xeol.db';
+const hasXeolDb = existsSync(XEOL_DB_PATH);
+
 describe('Xeol Integration', () => {
   test('should connect to xeol database when enabled', () => {
+    if (!hasXeolDb) {
+      console.warn('Xeol database not found - skipping test');
+      return;
+    }
+    
     const config = {
       enabled: true,
-      databasePath: 'resources/xeol.db',
+      databasePath: XEOL_DB_PATH,
     };
     
     const db = getXeolDatabaseConnection(config);
+    expect(db).toBeDefined();
     
     if (db) {
-      expect(db).toBeDefined();
       db.close();
-    } else {
-      // Database might not exist in test environment, skip
-      console.log('Skipping test - xeol database not found');
     }
   });
 
   test('should return null when xeol is disabled', () => {
     const config = {
       enabled: false,
-      databasePath: 'resources/xeol.db',
+      databasePath: XEOL_DB_PATH,
     };
     
     const db = getXeolDatabaseConnection(config);
@@ -40,17 +46,20 @@ describe('Xeol Integration', () => {
   });
 
   test('should query Apache HTTP Server EOL data from xeol', () => {
+    if (!hasXeolDb) {
+      console.warn('Xeol database not found - skipping test');
+      return;
+    }
+    
     const config = {
       enabled: true,
-      databasePath: 'resources/xeol.db',
+      databasePath: XEOL_DB_PATH,
     };
     
     const db = getXeolDatabaseConnection(config);
+    expect(db).toBeDefined();
     
-    if (!db) {
-      console.log('Skipping test - xeol database not found');
-      return;
-    }
+    if (!db) return;
 
     try {
       const result = queryXeolEOL(db, 'Apache HTTP Server', '2.2');
@@ -67,17 +76,20 @@ describe('Xeol Integration', () => {
   });
 
   test('should add xeol EOL status to search results', () => {
+    if (!hasXeolDb) {
+      console.warn('Xeol database not found - skipping test');
+      return;
+    }
+    
     const config = {
       enabled: true,
-      databasePath: 'resources/xeol.db',
+      databasePath: XEOL_DB_PATH,
     };
     
     const db = getXeolDatabaseConnection(config);
+    expect(db).toBeDefined();
     
-    if (!db) {
-      console.log('Skipping test - xeol database not found');
-      return;
-    }
+    if (!db) return;
 
     try {
       const results: SearchVulnsResult = {
@@ -100,17 +112,20 @@ describe('Xeol Integration', () => {
   });
 
   test('should not override existing EOL status', () => {
+    if (!hasXeolDb) {
+      console.warn('Xeol database not found - skipping test');
+      return;
+    }
+    
     const config = {
       enabled: true,
-      databasePath: 'resources/xeol.db',
+      databasePath: XEOL_DB_PATH,
     };
     
     const db = getXeolDatabaseConnection(config);
+    expect(db).toBeDefined();
     
-    if (!db) {
-      console.log('Skipping test - xeol database not found');
-      return;
-    }
+    if (!db) return;
 
     try {
       const existingStatus = {

@@ -11,7 +11,7 @@ import { parseVersion, compareVersions } from './version';
 import { resolve, dirname } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 
-const __dirname = dirname(new URL(import.meta.url).pathname);
+const __dirname = import.meta.dir;
 
 export interface XeolConfig {
   enabled: boolean;
