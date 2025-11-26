@@ -83,6 +83,10 @@ bun run cli -q "CVE-2024-27286"
 # Search for software
 bun run cli -q "Sudo 1.8.2"
 
+# Search for Angular (automatic CPE detection)
+bun run cli -q "Angular 18"
+# This will automatically match cpe:2.3:a:angular:angular:18:...
+
 # Multiple queries
 bun run cli -q "CVE-2024-27286" -q "GHSA-hfjr-m75m-wmh7"
 
