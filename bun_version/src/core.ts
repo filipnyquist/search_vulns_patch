@@ -12,6 +12,7 @@ import { search_cpes, MATCH_CPE_23_RE } from './utils/cpe_search';
 import { addEPSSScores } from './utils/epss';
 import { addEOLStatus } from './utils/eol';
 import { getEquivalentCpes } from './utils/equivalent_cpes';
+import { getXeolDatabaseConnection, addXeolEOLStatus } from './utils/xeol';
 
 /**
  * Merge vulnerabilities from different modules, combining aliases and deduplicating
@@ -230,8 +231,24 @@ export async function searchVulns(
   };
   
   // Add EOL (End-of-Life) status for detected products
+  // First try endoflife.date from vuln database
   if (vulnDb) {
     addEOLStatus(result, vulnDb);
+  }
+  
+  // If no EOL status found, try xeol database as fallback
+  if (!result.version_status && config.XEOL_DATABASE?.ENABLED) {
+    const xeolConfig = {
+      enabled: config.XEOL_DATABASE.ENABLED,
+      databasePath: config.XEOL_DATABASE.DATABASE_PATH,
+      autoDownload: config.XEOL_DATABASE.AUTO_DOWNLOAD,
+      downloadUrl: config.XEOL_DATABASE.DOWNLOAD_URL,
+    };
+    const xeolDb = getXeolDatabaseConnection(xeolConfig);
+    if (xeolDb) {
+      addXeolEOLStatus(result, xeolDb);
+      xeolDb.close();
+    }
   }
 
   // Close DB connections if we opened them

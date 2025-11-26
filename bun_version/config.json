@@ -8,6 +8,12 @@
   "PRODUCT_DATABASE": {
     "NAME": "resources/productdb.db3"
   },
+  "XEOL_DATABASE": {
+    "ENABLED": false,
+    "DATABASE_PATH": "resources/xeol.db",
+    "AUTO_DOWNLOAD": false,
+    "DOWNLOAD_URL": "https://data.xeol.io/xeol/databases/listing.json"
+  },
   "RECAPTCHA_AND_API": {
     "ENABLED": false,
     "SITE_KEY_V3": "<YOUR_SITE_KEY_V3>",

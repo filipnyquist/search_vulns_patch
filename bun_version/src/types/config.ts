@@ -11,12 +11,20 @@ export interface ModuleConfig {
   [key: string]: any;
 }
 
+export interface XeolConfig {
+  ENABLED?: boolean;
+  DATABASE_PATH?: string;
+  AUTO_DOWNLOAD?: boolean;
+  DOWNLOAD_URL?: string;
+}
+
 export interface Config {
   DATABASE_CONNECTION: {
     TYPE: string;
   };
   VULN_DATABASE: DatabaseConfig;
   PRODUCT_DATABASE: DatabaseConfig;
+  XEOL_DATABASE?: XeolConfig;
   RECAPTCHA_AND_API?: {
     ENABLED: boolean;
     SITE_KEY_V3?: string;
@@ -40,6 +48,12 @@ export const DEFAULT_CONFIG: Config = {
   },
   PRODUCT_DATABASE: {
     NAME: 'resources/productdb.db3',
+  },
+  XEOL_DATABASE: {
+    ENABLED: false,
+    DATABASE_PATH: 'resources/xeol.db',
+    AUTO_DOWNLOAD: false,
+    DOWNLOAD_URL: 'https://data.xeol.io/xeol/databases/listing.json',
   },
   RECAPTCHA_AND_API: {
     ENABLED: false,
