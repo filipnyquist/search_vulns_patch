@@ -194,33 +194,76 @@ async function searchVulnsBasic(
 ): Promise<Record<string, Vulnerability>> {
   const vulns: Record<string, Vulnerability> = {};
 
-  // Check if query is a vulnerability ID (CVE, GHSA, etc.)
-  const vulnIdPattern = /^(CVE-\d{4}-\d+|GHSA-[a-z0-9-]+)/i;
-  const match = query.match(vulnIdPattern);
+  // Split query by commas to handle multiple IDs
+  const queries = query.split(',').map(q => q.trim());
+  
+  for (const singleQuery of queries) {
+    // Check if query is a vulnerability ID (CVE, GHSA, etc.)
+    const cvePattern = /CVE-\d{4}-\d+/i;
+    const ghsaPattern = /GHSA-[a-z0-9-]+/i;
+    
+    const cveMatch = singleQuery.match(cvePattern);
+    const ghsaMatch = singleQuery.match(ghsaPattern);
 
-  if (match) {
-    // Search for vulnerability by ID
-    try {
-      const stmt = vulnDb.query('SELECT * FROM vulnerabilities WHERE id = ? OR id LIKE ?');
-      const results = stmt.all(query.toUpperCase(), `%${query.toUpperCase()}%`) as any[];
+    // Search for CVE in NVD table
+    if (cveMatch) {
+      const cveId = cveMatch[0];
+      try {
+        const stmt = vulnDb.query(
+          'SELECT * FROM nvd WHERE cve_id = ?'
+        );
+        const row = stmt.get(cveId.toUpperCase()) as any;
 
-      for (const row of results) {
-        const vuln = new Vulnerability({
-          id: row.id || query.toUpperCase(),
-          matchReason: MatchReason.VULN_ID,
-          matchSources: ['basic_search'],
-          description: row.description || '',
-          published: row.published || '',
-          modified: row.modified || '',
-          cvssVer: row.cvss_version || '',
-          cvss: row.cvss_score?.toString() || '-1.0',
-          cvssVec: row.cvss_vector || '',
-          cisaKnownExploited: row.cisa_known_exploited === 1,
-        });
-        vulns[vuln.id] = vuln;
+        if (row) {
+          const vuln = new Vulnerability({
+            id: row.cve_id || cveId.toUpperCase(),
+            matchReason: MatchReason.VULN_ID,
+            matchSources: ['nvd'],
+            description: row.description || '',
+            published: row.published || '',
+            modified: row.last_modified || '',
+            cvssVer: row.cvss_version || '',
+            cvss: row.base_score?.toString() || '-1.0',
+            cvssVec: row.vector || '',
+            cisaKnownExploited: row.cisa_known_exploited === 1,
+            href: `https://nvd.nist.gov/vuln/detail/${cveId.toUpperCase()}`,
+          });
+          vulns[vuln.id] = vuln;
+        }
+      } catch (error) {
+        console.error(`Error searching for CVE ${cveId}:`, error);
       }
-    } catch (error) {
-      console.error('Error searching for vulnerability by ID:', error);
+    }
+
+    // Search for GHSA ID in GHSA table
+    if (ghsaMatch) {
+      const ghsaId = ghsaMatch[0];
+      try {
+        const stmt = vulnDb.query(
+          'SELECT * FROM ghsa WHERE ghsa_id = ?'
+        );
+        // GHSA IDs are stored in original case (lowercase letters)
+        const row = stmt.get(ghsaId) as any;
+
+        if (row) {
+          const vuln = new Vulnerability({
+            id: row.ghsa_id || ghsaId,
+            matchReason: MatchReason.VULN_ID,
+            matchSources: ['ghsa'],
+            description: row.description || '',
+            published: row.published || '',
+            modified: row.last_modified || '',
+            cvssVer: row.cvss_version || '',
+            cvss: row.base_score?.toString() || '-1.0',
+            cvssVec: row.vector || '',
+            cisaKnownExploited: false,
+            href: `https://github.com/advisories/${ghsaId.toUpperCase()}`,
+          });
+          vulns[vuln.id] = vuln;
+        }
+      } catch (error) {
+        console.error(`Error searching for GHSA ${ghsaId}:`, error);
+      }
     }
   }
 
