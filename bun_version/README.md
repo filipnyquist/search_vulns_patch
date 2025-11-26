@@ -1,12 +1,13 @@
 # search_vulns - Bun.js/TypeScript Version
 
-Complete TypeScript implementation of search_vulns with **full CPE search**, **EPSS scores**, and **EOL detection** using Bun.js runtime.
+Complete TypeScript implementation of search_vulns with **full CPE search**, **EPSS scores**, **EOL detection**, and **Equivalent CPEs** using Bun.js runtime.
 
 ## Features
 
 - ✅ **Full CPE Search** - Complete port of cpe_search module for product name → CPE conversion
-- ✅ **EPSS Scores** - Exploit Prediction Scoring System integration for exploitation probability (**NEW!**)
-- ✅ **End-of-Life Detection** - Automatic detection of EOL/outdated product versions (**NEW!**)
+- ✅ **Equivalent CPEs** - Support for deprecated CPEs, Debian aliases, and manual equivalences (**NEW!**)
+- ✅ **EPSS Scores** - Exploit Prediction Scoring System integration for exploitation probability
+- ✅ **End-of-Life Detection** - Automatic detection of EOL/outdated product versions
 - ✅ **CPE-based vulnerability search** with version range matching
 - ✅ **Direct CVE/GHSA ID lookups**
 - ✅ **Exploit aggregation** from NVD, Exploit-DB, and PoC-in-GitHub

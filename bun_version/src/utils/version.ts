@@ -6,13 +6,16 @@
 /**
  * Parse a version string into comparable parts
  */
-export function parseVersion(versionStr: string): (string | number)[] {
-  if (!versionStr || versionStr === '*') {
+export function parseVersion(versionStr: string | number | null | undefined): (string | number)[] {
+  // Convert to string if it's a number or other type
+  const versionString = versionStr != null ? String(versionStr) : '';
+  
+  if (!versionString || versionString === '*') {
     return [];
   }
 
   // Split on dots, dashes, underscores
-  const parts = versionStr.split(/[.\-_]/);
+  const parts = versionString.split(/[.\-_]/);
   
   return parts.map(part => {
     // Try to parse as number
@@ -28,9 +31,13 @@ export function parseVersion(versionStr: string): (string | number)[] {
  * Compare two versions
  * Returns: -1 if a < b, 0 if a == b, 1 if a > b
  */
-export function compareVersions(a: string, b: string): number {
-  const aParts = parseVersion(a);
-  const bParts = parseVersion(b);
+export function compareVersions(a: string | number | null | undefined, b: string | number | null | undefined): number {
+  // Convert to strings
+  const aStr = a != null ? String(a) : '';
+  const bStr = b != null ? String(b) : '';
+  
+  const aParts = parseVersion(aStr);
+  const bParts = parseVersion(bStr);
   
   const maxLen = Math.max(aParts.length, bParts.length);
   
