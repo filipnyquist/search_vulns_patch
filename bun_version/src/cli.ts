@@ -51,11 +51,23 @@ function printVulns(vulns: Record<string, Vulnerability>, toString: boolean = fa
       if (vuln.cisaKnownExploited) {
         printStr += ' (' + RED + 'Actively exploited' + SANE + ')';
       }
+      // Add EPSS score if available
+      if (vuln.epss) {
+        const epssValue = parseFloat(vuln.epss.replace('%', ''));
+        let epssColor = SANE;
+        if (epssValue >= 10) epssColor = RED;
+        else if (epssValue >= 5) epssColor = YELLOW;
+        printStr += ' (' + epssColor + 'EPSS: ' + vuln.epss + SANE + ')';
+      }
     } else {
       printStr = vuln.id;
       printStr += ' (CVSSv' + vuln.cvssVer + '/' + vuln.cvss + ')';
       if (vuln.cisaKnownExploited) {
         printStr += ' (Actively exploited)';
+      }
+      // Add EPSS score if available
+      if (vuln.epss) {
+        printStr += ' (EPSS: ' + vuln.epss + ')';
       }
     }
     printStr += ': ' + description + '\n';
@@ -265,8 +277,65 @@ async function main() {
         const productIdsStr = allProductIds.join('/');
         if (!options.output) {
           printit(productIdsStr + ')', BRIGHT_BLUE);
+          
+          // Display EOL status if available
+          if (svResult.version_status) {
+            const vs = svResult.version_status as any;
+            let statusColor = SANE;
+            let statusSymbol = '';
+            
+            if (vs.status === 'eol') {
+              statusColor = RED;
+              statusSymbol = '✗ ';
+            } else if (vs.status === 'outdated') {
+              statusColor = YELLOW;
+              statusSymbol = '⚠ ';
+            } else if (vs.status === 'current') {
+              statusColor = GREEN;
+              statusSymbol = '✓ ';
+            }
+            
+            const statusText = {
+              'current': 'Current version',
+              'outdated': `Outdated (latest: ${vs.latest})`,
+              'eol': `End-of-Life (latest: ${vs.latest})`,
+              'N/A': 'Version status unknown'
+            }[vs.status] || '';
+            
+            if (statusText) {
+              printit(statusSymbol + statusText, statusColor);
+              if (vs.ref) {
+                printit('  Info: ' + vs.ref, SANE);
+              }
+            }
+          }
         } else {
           outString += productIdsStr + ')\n';
+          
+          // Add EOL status to file output
+          if (svResult.version_status) {
+            const vs = svResult.version_status as any;
+            const statusSymbol = {
+              'eol': '✗ ',
+              'outdated': '⚠ ',
+              'current': '✓ ',
+              'N/A': ''
+            }[vs.status] || '';
+            
+            const statusText = {
+              'current': 'Current version',
+              'outdated': `Outdated (latest: ${vs.latest})`,
+              'eol': `End-of-Life (latest: ${vs.latest})`,
+              'N/A': 'Version status unknown'
+            }[vs.status] || '';
+            
+            if (statusText) {
+              outString += statusSymbol + statusText + '\n';
+              if (vs.ref) {
+                outString += '  Info: ' + vs.ref + '\n';
+              }
+            }
+          }
         }
       }
 

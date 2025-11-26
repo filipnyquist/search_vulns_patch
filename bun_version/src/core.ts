@@ -9,6 +9,8 @@ import {
   getCpeVersion,
 } from './utils/version';
 import { search_cpes, MATCH_CPE_23_RE } from './utils/cpe_search';
+import { addEPSSScores } from './utils/epss';
+import { addEOLStatus } from './utils/eol';
 
 /**
  * Merge vulnerabilities from different modules, combining aliases and deduplicating
@@ -165,6 +167,9 @@ export async function searchVulns(
     
     // Add exploit information
     addExploitInfo(vulns, vulnDb);
+    
+    // Add EPSS scores (exploitation probability)
+    addEPSSScores(vulns, vulnDb);
 
     // Filter vulnerabilities based on options
     for (const vulnId of Object.keys(vulns)) {
@@ -197,6 +202,18 @@ export async function searchVulns(
     }
   }
 
+  // Build result object
+  const result: SearchVulnsResult = {
+    product_ids: productIds,
+    vulns: vulns,
+    pot_product_ids: potProductIds,
+  };
+  
+  // Add EOL (End-of-Life) status for detected products
+  if (vulnDb) {
+    addEOLStatus(result, vulnDb);
+  }
+
   // Close DB connections if we opened them
   if (closeVulnDbAfter && vulnDb) {
     vulnDb.close();
@@ -205,11 +222,7 @@ export async function searchVulns(
     productDb.close();
   }
 
-  return {
-    product_ids: productIds,
-    vulns: vulns,
-    pot_product_ids: potProductIds,
-  };
+  return result;
 }
 
 /**
