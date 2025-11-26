@@ -11,6 +11,7 @@ import {
 import { search_cpes, MATCH_CPE_23_RE } from './utils/cpe_search';
 import { addEPSSScores } from './utils/epss';
 import { addEOLStatus } from './utils/eol';
+import { getEquivalentCpes } from './utils/equivalent_cpes';
 
 /**
  * Merge vulnerabilities from different modules, combining aliases and deduplicating
@@ -147,7 +148,14 @@ export async function searchVulns(
       );
       
       if (cpeSearchResult.cpes && cpeSearchResult.cpes.length > 0) {
-        productIds.cpe = cpeSearchResult.cpes.map(([cpe, _score]) => cpe);
+        const baseCpe = cpeSearchResult.cpes[0][0];
+        
+        // Get equivalent CPEs if not a product ID query
+        if (isProductIdQuery) {
+          productIds.cpe = [baseCpe];
+        } else {
+          productIds.cpe = await getEquivalentCpes(baseCpe, productDb);
+        }
       }
       
       if (cpeSearchResult.pot_cpes && cpeSearchResult.pot_cpes.length > 0) {
@@ -155,7 +163,19 @@ export async function searchVulns(
       }
     } else {
       // Query is already a CPE string
-      productIds.cpe = [queryProcessed];
+      // Normalize CPE if needed
+      let cpe = queryProcessed;
+      const cpeParts = cpe.split(':');
+      if (cpeParts.length < 13) {
+        cpe = cpe + ':*'.repeat(13 - cpeParts.length);
+      }
+      
+      // Get equivalent CPEs if not a product ID query
+      if (isProductIdQuery) {
+        productIds.cpe = [cpe];
+      } else {
+        productIds.cpe = await getEquivalentCpes(cpe, productDb);
+      }
     }
   }
 
