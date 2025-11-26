@@ -180,6 +180,38 @@ function findXeolProductForCpe(
 }
 
 /**
+ * Generate a user-friendly reference URL for a product
+ */
+function generateReferenceUrl(productName: string): string {
+  // If product name looks like a CPE, try to extract a friendlier name
+  if (productName.startsWith('cpe:2.3:')) {
+    // Format: cpe:2.3:part:vendor:product:...
+    const parts = productName.split(':');
+    if (parts.length >= 5) {
+      const product = parts[4] || '';
+      // Use product name for URL
+      return `https://endoflife.date/${product.replace(/_/g, '-')}`;
+    }
+  } else if (productName.startsWith('cpe:/')) {
+    // Format: cpe:/part:vendor:product:...
+    const parts = productName.split(':');
+    if (parts.length >= 4) {
+      const product = parts[3] || '';
+      return `https://endoflife.date/${product.replace(/_/g, '-')}`;
+    }
+  }
+  
+  // For package names like "jquery/jquery", use the last part
+  if (productName.includes('/')) {
+    const parts = productName.split('/');
+    return `https://endoflife.date/${parts[parts.length - 1]}`;
+  }
+  
+  // For normal names, convert to URL-friendly format
+  return `https://endoflife.date/${productName.toLowerCase().replace(/\s+/g, '-')}`;
+}
+
+/**
  * Get xeol database connection
  */
 export function getXeolDatabaseConnection(config: XeolConfig): Database | null {
@@ -262,7 +294,7 @@ export function queryXeolEOL(
       return {
         status: isEol ? 'eol' : 'N/A',
         latest: latest || latestCycle.release_cycle,
-        ref: `https://endoflife.date/${product.name.toLowerCase().replace(/\s+/g, '-')}`,
+        ref: generateReferenceUrl(product.name),
       };
     }
 
@@ -293,7 +325,7 @@ export function queryXeolEOL(
           versionStatus = {
             status: isEol ? 'eol' : 'current',
             latest: latest || cycle.latest_release || cycle.release_cycle,
-            ref: `https://endoflife.date/${product.name.toLowerCase().replace(/\s+/g, '-')}`,
+            ref: generateReferenceUrl(product.name),
           };
           break;
         } else {
@@ -301,7 +333,7 @@ export function queryXeolEOL(
           versionStatus = {
             status: isEol ? 'eol' : 'outdated',
             latest: latest || cycle.latest_release || cycle.release_cycle,
-            ref: `https://endoflife.date/${product.name.toLowerCase().replace(/\s+/g, '-')}`,
+            ref: generateReferenceUrl(product.name),
           };
           break;
         }
@@ -310,7 +342,7 @@ export function queryXeolEOL(
         versionStatus = {
           status: 'eol',
           latest: latest || cycles[0].latest_release || cycles[0].release_cycle,
-          ref: `https://endoflife.date/${product.name.toLowerCase().replace(/\s+/g, '-')}`,
+          ref: generateReferenceUrl(product.name),
         };
       }
     }

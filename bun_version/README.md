@@ -78,6 +78,10 @@ Automatically detects if your product version is:
 - ⚠️ **Outdated** - Newer version available but still supported
 - ✗ **End-of-Life** - Version is no longer supported
 
+**Data Sources:**
+- **Primary**: endoflife.date data from vulnerability database
+- **Fallback**: [xeol's dataset](https://github.com/xeol-io/xeoldb) with automatic CPE mapping (optional, see [XEOL_INTEGRATION.md](XEOL_INTEGRATION.md))
+
 Example output:
 ```
 [+] jquery 3.1.2 (cpe:2.3:a:jquery:jquery:3.1.2:*:*:*:*:*:*:*)
