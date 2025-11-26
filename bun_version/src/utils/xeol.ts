@@ -143,7 +143,6 @@ function findXeolProductForCpe(
 
     // Try fuzzy matching with LIKE
     const normalizedProduct = normalizeProductName(cpeInfo.product);
-    const normalizedVendor = normalizeProductName(cpeInfo.vendor);
     
     // Try product-based fuzzy match
     const fuzzyQuery = xeolDb.query(
@@ -159,7 +158,7 @@ function findXeolProductForCpe(
     
     const fuzzyPatterns = [
       `%${normalizedProduct.replace(/\s/g, '')}%`,
-      `%${normalizedProduct.replace(/\s/g, '')}%`,
+      `%${normalizedProduct.replace(/-/g, '')}%`,
       `%${normalizedProduct}%`,
     ];
     
@@ -282,8 +281,17 @@ export function queryXeolEOL(
     // First check latest_release in each cycle, then fall back to release_cycle
     for (const cycle of cycles) {
       const candidateVersion = cycle.latest_release || cycle.release_cycle;
-      if (candidateVersion && (!latest || candidateVersion > latest)) {
+      if (!candidateVersion) continue;
+      
+      // Use version comparison instead of string comparison
+      if (!latest) {
         latest = candidateVersion;
+      } else {
+        const latestParsed = parseVersion(latest);
+        const candidateParsed = parseVersion(candidateVersion);
+        if (latestParsed && candidateParsed && compareVersions(candidateParsed, latestParsed) > 0) {
+          latest = candidateVersion;
+        }
       }
     }
     
@@ -329,11 +337,12 @@ export function queryXeolEOL(
         // Version is in this cycle or newer
         
         // Check if this version is actually newer than all known cycles
-        // This indicates the database may be outdated
+        // This indicates the database may be outdated - return null to allow
+        // fallback to other data sources that might have newer information
         const latestKnownVersion = parseVersion(latest);
         if (latestKnownVersion && compareVersions(queryVersion, latestKnownVersion) > 0) {
           // Query version is newer than anything in the database
-          // Can't determine status - data might be outdated
+          // Can't determine status - data is likely outdated
           return null;
         }
         
@@ -484,10 +493,8 @@ export async function downloadXeolDatabase(
     const extractedPath = resolve(targetDir, 'xeol.db');
     if (existsSync(extractedPath) && extractedPath !== targetPath) {
       await Bun.write(targetPath, await Bun.file(extractedPath).arrayBuffer());
-      // Clean up extracted file if different from target
-      if (extractedPath !== targetPath) {
-        await Bun.$`rm -f ${extractedPath}`;
-      }
+      // Clean up extracted file
+      await Bun.$`rm -f ${extractedPath}`;
     }
 
     // Clean up archive
