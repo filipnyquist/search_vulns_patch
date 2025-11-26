@@ -12,6 +12,8 @@ import { fileURLToPath } from 'url';
 
 // Resource file paths
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const DEPRECATED_CPES_FILENAME = 'deprecated-cpes.json';
+const DEPRECATED_CPES_FILE = join(__dirname, 'resources', DEPRECATED_CPES_FILENAME);
 const DEBIAN_EQUIV_CPES_FILE = join(__dirname, 'resources', 'debian_equiv_cpes.json');
 const MAN_EQUIVALENT_CPES_FILE = join(__dirname, 'resources', 'man_equiv_cpes.json');
 
@@ -20,6 +22,11 @@ const FULL_DEPRECATION_THRESHOLD = 0.16;
 // Global cache for equivalent CPEs
 let EQUIVALENT_CPES: Record<string, string[]> = {};
 let EQUIVALENT_CPES_LOADED = false;
+
+// Database result interfaces for type safety
+interface ProductCpeCountResult {
+  count: number;
+}
 
 /**
  * Get version sections from a version string
@@ -52,8 +59,7 @@ export async function loadEquivalentCpes(productDbCursor: Database): Promise<voi
   // Note: deprecated-cpes.json is downloaded during updates from NVD
   // For now, we'll handle it gracefully if it doesn't exist
   try {
-    const deprecatedCpesPath = join(__dirname, 'resources', 'deprecated-cpes.json');
-    const deprecatedCpesFile = await Bun.file(deprecatedCpesPath).text();
+    const deprecatedCpesFile = await Bun.file(DEPRECATED_CPES_FILE).text();
     const cpeDeprecationsRaw: Record<string, string[]> = JSON.parse(deprecatedCpesFile);
 
     // Group deprecations by product prefix
@@ -75,7 +81,7 @@ export async function loadEquivalentCpes(productDbCursor: Database): Promise<voi
         const stmt = productDbCursor.query(
           'SELECT count FROM product_cpe_counts WHERE product_cpe_prefix = ?'
         );
-        const result = stmt.get(productCpePrefix) as any;
+        const result = stmt.get(productCpePrefix) as ProductCpeCountResult | null;
         
         if (result && result.count) {
           const productCpeCount = result.count;
@@ -139,7 +145,12 @@ export async function loadEquivalentCpes(productDbCursor: Database): Promise<voi
     equivalentCpesDictsList.push(deprecatedCpes);
   } catch (error) {
     // deprecated-cpes.json doesn't exist yet, that's okay
-    console.warn('deprecated-cpes.json not found, skipping NVD deprecations');
+    // Only log if there's an actual error (not just file not found)
+    if (error instanceof Error && error.message.includes('ENOENT')) {
+      // File doesn't exist - this is expected for fresh installations, silently skip
+    } else {
+      console.error('[equivalent_cpes] Error loading deprecated CPEs:', error instanceof Error ? error.message : error);
+    }
   }
 
   // Load manually curated equivalent CPEs
@@ -148,7 +159,7 @@ export async function loadEquivalentCpes(productDbCursor: Database): Promise<voi
     const manualEquivalentCpes: Record<string, string[]> = JSON.parse(manEquivCpesFile);
     equivalentCpesDictsList.push(manualEquivalentCpes);
   } catch (error) {
-    console.error('Error loading manual equivalent CPEs:', error);
+    console.error('[equivalent_cpes] Error loading manual equivalent CPEs:', error instanceof Error ? error.message : error);
   }
 
   // Load Debian equivalent CPEs
@@ -157,7 +168,7 @@ export async function loadEquivalentCpes(productDbCursor: Database): Promise<voi
     const debianEquivalentCpes: Record<string, string[]> = JSON.parse(debianEquivCpesFile);
     equivalentCpesDictsList.push(debianEquivalentCpes);
   } catch (error) {
-    console.error('Error loading Debian equivalent CPEs:', error);
+    console.error('[equivalent_cpes] Error loading Debian equivalent CPEs:', error instanceof Error ? error.message : error);
   }
 
   // Unite information from different sources
