@@ -177,9 +177,24 @@ The automatic CPE mapping eliminates the need to maintain hardcoded product mapp
 
 ## Limitations
 
-1. **CPE Mapping Accuracy**: Automatic mapping may not always find the correct product
-2. **Database Size**: The xeol database is relatively large compared to the focused endoflife.date table
-3. **Update Frequency**: Database updates require manual download (unless AUTO_DOWNLOAD is enabled)
+1. **Database Completeness**: The xeol database may not have complete or up-to-date information for all products
+   - Some products may only have older release cycles
+   - Example: Apache HTTP Server in the test database only has versions up to 2.2, missing newer 2.4.x releases
+   - When a queried version is newer than all versions in the database, xeol returns null (allowing fallback to other sources)
+
+2. **CPE Mapping Accuracy**: Automatic mapping may not always find the correct product
+   - The fuzzy matching algorithm does its best but isn't perfect
+   - Some CPE prefixes may not map to any xeol product
+
+3. **"Latest" Version Caveat**: The "latest" version reported is the latest *found in the xeol database*, not necessarily the actual latest version available
+   - If the database is outdated, the reported "latest" may be old
+   - This is why xeol works as a fallback - endoflife.date data (when available) is typically more current
+
+4. **Database Size**: The xeol database is ~47MB (as of 2025-11-26)
+   - Relatively large compared to the focused endoflife.date table
+   
+5. **Update Frequency**: Database updates require manual download (unless AUTO_DOWNLOAD is enabled)
+   - Regular updates are recommended to get the latest EOL information
 
 ## Testing
 
@@ -207,10 +222,36 @@ If you see "xeol database not found" warnings:
 
 ### No EOL Data
 
-If xeol doesn't return EOL data:
-1. Check that the product exists in the database
-2. Verify CPE prefix is correct
-3. Check mapping cache (may need to clear and restart)
+If xeol doesn't return EOL data for a product:
+1. **Version too new**: The version may be newer than what's in the xeol database
+   - Example: Apache HTTP Server 2.4 won't be found if the database only has data up to 2.2
+   - This is expected behavior - xeol returns null to allow fallback to other sources
+2. **Product not found**: Check that the product exists in the database by querying directly
+3. **CPE mapping failed**: Verify CPE prefix is correct - check mapping cache (may need to clear and restart)
+
+### Incomplete or Outdated Data
+
+The xeol database may have incomplete coverage:
+- Some products only have older release cycles
+- The "latest" version shown is the latest *in the database*, not necessarily the actual latest release
+- **Recommendation**: Use endoflife.date as primary source, xeol as fallback
+- Download newer database versions regularly from https://data.xeol.io/xeol/databases/listing.json
+
+### Example: Understanding Test Output
+
+When testing Apache HTTP Server, you might see:
+```
+Testing: Apache HTTP Server 2.2
+✗ Status: eol
+  Latest: 2.2  ← Latest in database (not actual latest!)
+  Reference: https://endoflife.date/http-server
+```
+
+This means:
+- Version 2.2 is confirmed EOL (correct - ended 2017-07-11)
+- Latest *in the database* is 2.2
+- The database doesn't have information about newer versions (2.4.x)
+- This is why endoflife.date should be the primary source
 
 ### Performance Issues
 

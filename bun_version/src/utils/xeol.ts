@@ -278,11 +278,18 @@ export function queryXeolEOL(
     let latest = '';
     let versionStatus: VersionStatus | null = null;
     
-    // Find the latest version
+    // Find the latest version across all cycles
+    // First check latest_release in each cycle, then fall back to release_cycle
     for (const cycle of cycles) {
-      if (cycle.latest_release && (!latest || cycle.latest_release > latest)) {
-        latest = cycle.latest_release;
+      const candidateVersion = cycle.latest_release || cycle.release_cycle;
+      if (candidateVersion && (!latest || candidateVersion > latest)) {
+        latest = candidateVersion;
       }
+    }
+    
+    // If no latest found, something is wrong with the data
+    if (!latest) {
+      return null;
     }
     
     // If no version specified, check if the latest is EOL
@@ -293,7 +300,7 @@ export function queryXeolEOL(
       
       return {
         status: isEol ? 'eol' : 'N/A',
-        latest: latest || latestCycle.release_cycle,
+        latest: latest,
         ref: generateReferenceUrl(product.name),
       };
     }
@@ -304,7 +311,7 @@ export function queryXeolEOL(
       return null;
     }
 
-    // Find matching cycle
+    // Find matching cycle for the query version
     for (let i = 0; i < cycles.length; i++) {
       const cycle = cycles[i];
       const cycleVersion = parseVersion(cycle.release_cycle);
@@ -320,11 +327,21 @@ export function queryXeolEOL(
       // Check if query version matches this cycle
       if (compareVersions(queryVersion, cycleVersion) >= 0) {
         // Version is in this cycle or newer
+        
+        // Check if this version is actually newer than all known cycles
+        // This indicates the database may be outdated
+        const latestKnownVersion = parseVersion(latest);
+        if (latestKnownVersion && compareVersions(queryVersion, latestKnownVersion) > 0) {
+          // Query version is newer than anything in the database
+          // Can't determine status - data might be outdated
+          return null;
+        }
+        
         if (latestInCycle && compareVersions(queryVersion, latestInCycle) >= 0) {
           // Query version is the latest or newer in this cycle
           versionStatus = {
             status: isEol ? 'eol' : 'current',
-            latest: latest || cycle.latest_release || cycle.release_cycle,
+            latest: latest,
             ref: generateReferenceUrl(product.name),
           };
           break;
@@ -332,7 +349,7 @@ export function queryXeolEOL(
           // Query version is within this cycle but not the latest
           versionStatus = {
             status: isEol ? 'eol' : 'outdated',
-            latest: latest || cycle.latest_release || cycle.release_cycle,
+            latest: latest,
             ref: generateReferenceUrl(product.name),
           };
           break;
@@ -341,7 +358,7 @@ export function queryXeolEOL(
         // This is the oldest cycle and version is older
         versionStatus = {
           status: 'eol',
-          latest: latest || cycles[0].latest_release || cycles[0].release_cycle,
+          latest: latest,
           ref: generateReferenceUrl(product.name),
         };
       }
