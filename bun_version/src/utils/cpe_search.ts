@@ -38,6 +38,7 @@ const POPULAR_QUERY_CORRECTIONS: Record<string, string> = {
   'symfony': 'sensiolabs',
   'electron': 'electronjs',
   'microsoft exchange': 'server',
+  'angular': 'angular',
 };
 
 const QUERY_ABBREVIATIONS: Record<string, [string[], string]> = {

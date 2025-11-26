@@ -109,6 +109,11 @@ CVE-2020-11023 (CVSSv3.1/6.9) (Actively exploited) (EPSS: 2.1%): ...
 CVE-2020-11022 (CVSSv3.1/6.9) (EPSS: 1.8%): ...
 CVE-2019-11358 (CVSSv3.1/6.1) (EPSS: 0.9%): ...
 
+# Search Angular - automatic CPE detection
+$ bun src/cli.ts -q 'Angular 18'
+[+] Angular 18 (cpe:2.3:a:angular:angular:18:-:*:*:*:node.js:*:*)
+# Finds vulnerabilities without needing to specify full CPE string
+
 # JSON output includes EPSS and EOL data
 $ bun src/cli.ts -q 'jquery 3.1.2' -f json
 {
